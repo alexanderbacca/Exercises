@@ -1,0 +1,5 @@
+{
+  "name": "Pulse & Power Workout Tracker",
+  "description": "An energetic, high-contrast workout application that tracks exercise progress, measures heart rate, and generates custom AI-powered illustrative guides.",
+  "requestFramePermissions": []
+}
