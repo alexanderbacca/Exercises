@@ -24,5 +24,46 @@
 <body>
     <div id="root"></div>
     <script type="module" src="/index.tsx"></script>
+    <script>
+(function () {
+    var IMAGE_BASE = 'https://raw.githubusercontent.com/alexanderbacca/Exercises/main';
+    var IMAGES = [
+        'Squats.png',
+        'Push-ups.png',
+        'Mountain%20climber.png',
+        'Reverse%20Dips.png',
+        'High%20Knees.png',
+        'Planks.png',
+        'Crunches.png',
+        'Bicycle%20Crunches.png',
+        'Elevated%20Leg%20Push-ups.png'
+    ];
+
+    // Keep the photos in a long-lived cache so they are instant on future visits
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+            navigator.serviceWorker.register('./sw.js').catch(function () {});
+        });
+    }
+
+    // Download upcoming exercise photos in the background while you use the app
+    function preloadNext(queue) {
+        var name = queue.shift();
+        if (!name) return;
+        var img = new Image();
+        img.onload = img.onerror = function () { preloadNext(queue); };
+        img.src = IMAGE_BASE + '/' + name;
+    }
+
+    window.addEventListener('load', function () {
+        setTimeout(function () {
+            var queue = IMAGES.slice();
+            preloadNext(queue);  // three photos at a time, in workout order
+            preloadNext(queue);
+            preloadNext(queue);
+        }, 500);
+    });
+})();
+    </script>
 </body>
 </html>
