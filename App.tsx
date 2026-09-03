@@ -13,6 +13,14 @@ const App: React.FC = () => {
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState<number>(0);
   const [countdown, setCountdown] = useState<number>(15);
   const [prepCountdown, setPrepCountdown] = useState<number>(3);
+  const [isSending, setIsSending] = useState(false);
+  const [submissions, setSubmissions] = useState<any[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('ppt_submissions') || '[]');
+    } catch {
+      return [];
+    }
+  });
 
   // Prep Countdown timer logic (3 seconds)
   useEffect(() => {
@@ -116,17 +124,80 @@ const App: React.FC = () => {
     setState(AppState.FINAL_SUMMARY);
   };
 
-  const saveData = () => {
-    const today = new Date().toISOString().split('T')[0];
-    const sessionStr = `${sessionCount} Session${sessionCount > 1 ? 's' : ''}`;
-    const baseUrl = "https://docs.google.com/forms/d/e/1FAIpQLSeM3r6WtXCYD7nzH6RMCfXAriTnWT9fXWh-1JQPWZjHvyCOcg/viewform?usp=pp_url";
+  const FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSeM3r6WtXCYD7nzH6RMCfXAriTnWT9fXWh-1JQPWZjHvyCOcg/formResponse';
+
+  const sendToGoogleForm = async (rec: any) => {
     const params = new URLSearchParams({
-      'entry.1646637161': today,
-      'entry.514818379': pulseBefore.toString(),
-      'entry.1947971010': pulseAfter.toString(),
-      'entry.185983801': sessionStr
+      'entry.1646637161': rec.date,
+      'entry.514818379': rec.pulseBefore.toString(),
+      'entry.1947971010': rec.pulseAfter.toString(),
+      'entry.185983801': rec.sessions
     });
-    window.open(`${baseUrl}&${params.toString()}`, '_blank');
+    // Silent background submit: Google Forms saves the data but hides the response (no-cors)
+    await fetch(FORM_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    });
+  };
+
+  const persistSubmissions = (list: any[]) => {
+    const trimmed = list.slice(0, 5); // Keep only the last 5 records
+    localStorage.setItem('ppt_submissions', JSON.stringify(trimmed));
+    setSubmissions(trimmed);
+  };
+
+  const saveData = async () => {
+    if (isSending) return;
+    setIsSending(true);
+    const rec: any = {
+      id: Date.now(),
+      date: new Date().toISOString().split('T')[0],
+      pulseBefore,
+      pulseAfter,
+      sessions: `${sessionCount} Session${sessionCount > 1 ? 's' : ''}`,
+      status: 'pending',
+      sending: false
+    };
+    try {
+      await sendToGoogleForm(rec);
+      rec.status = 'sent';
+    } catch (e) {
+      rec.status = 'pending'; // No internet or Google unreachable: kept locally for retry
+    }
+    persistSubmissions([rec, ...submissions]);
+    setIsSending(false);
+    setState(AppState.DATA_SENT);
+  };
+
+  const resendSubmission = async (id: number) => {
+    const list = [...submissions];
+    const rec = list.find((r: any) => r.id === id);
+    if (!rec || rec.sending) return;
+    rec.sending = true;
+    setSubmissions([...list]);
+    try {
+      await sendToGoogleForm(rec);
+      rec.status = 'sent';
+    } catch (e) {
+      rec.status = 'pending';
+    }
+    rec.sending = false;
+    persistSubmissions(list);
+  };
+
+  const handleExit = () => {
+    // Browsers only let a page close its window if it was opened by a script or
+    // launched from a home-screen shortcut. If blocked, return to the start screen.
+    window.open('', '_self');
+    window.close();
+    setTimeout(() => {
+      setSessionCount(1);
+      setPulseBefore(0);
+      setPulseAfter(0);
+      setState(AppState.START);
+    }, 400);
   };
 
   const skipTimer = () => {
@@ -327,11 +398,69 @@ const App: React.FC = () => {
 
             <button
               onClick={saveData}
-              className="w-full bg-white text-black font-black text-4xl py-10 rounded-[3rem] uppercase italic tracking-tighter shadow-[0_30px_60px_rgba(255,255,255,0.1)] hover:bg-orange-500 hover:text-white transition-all transform hover:-translate-y-3 active:scale-95 group overflow-hidden relative"
+              disabled={isSending}
+              className="w-full bg-white text-black font-black text-4xl py-10 rounded-[3rem] uppercase italic tracking-tighter shadow-[0_30px_60px_rgba(255,255,255,0.1)] hover:bg-orange-500 hover:text-white transition-all transform hover:-translate-y-3 active:scale-95 group overflow-hidden relative disabled:opacity-50"
             >
-              <span className="relative z-10">UPLOAD PERFORMANCE</span>
+              <span className="relative z-10">{isSending ? 'Sending...' : 'Upload Performance'}</span>
               <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-red-600 opacity-0 group-hover:opacity-100 transition-opacity"></div>
             </button>
+          </div>
+        )}
+
+        {state === AppState.DATA_SENT && (
+          <div className="w-full max-w-2xl space-y-8 animate-in fade-in zoom-in duration-700">
+            <div className="text-center space-y-6">
+              <div className="w-24 h-24 mx-auto bg-gradient-to-br from-orange-500 to-red-600 rounded-full flex items-center justify-center shadow-[0_0_60px_rgba(249,115,22,0.4)]">
+                <span className="text-6xl font-black italic text-white">✓</span>
+              </div>
+              <h2 className="text-6xl md:text-7xl font-black italic uppercase text-gradient tracking-tighter">Data Sent</h2>
+              <p className="text-gray-400 text-lg font-medium">Your performance was sent to Google Sheets in the background, no extra windows.</p>
+            </div>
+
+            <div className="bg-neutral-900/40 p-8 rounded-[2.5rem] border border-white/5 backdrop-blur-xl">
+              <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] mb-6">Last 5 submissions on this device</p>
+              {submissions.length === 0 ? (
+                <p className="text-gray-500 text-center font-bold italic">No records yet</p>
+              ) : (
+                <div className="space-y-4">
+                  {submissions.map((r: any) => (
+                    <div key={r.id} className="flex items-center justify-between gap-4 bg-black/40 border border-white/5 rounded-2xl px-6 py-4">
+                      <div className="min-w-0">
+                        <p className="text-white font-black italic truncate">{r.date} · {r.sessions}</p>
+                        <p className="text-xs text-gray-400 font-bold">Pulse {r.pulseBefore} → {r.pulseAfter}</p>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${r.status === 'sent' ? 'text-green-500' : 'text-orange-500'}`}>
+                          {r.status === 'sent' ? 'Sent' : 'Pending'}
+                        </span>
+                        <button
+                          onClick={() => resendSubmission(r.id)}
+                          disabled={r.sending}
+                          className="bg-white/10 hover:bg-orange-500 text-white font-black uppercase text-xs tracking-widest px-4 py-2 rounded-xl transition-all active:scale-95 disabled:opacity-40"
+                        >
+                          {r.sending ? '...' : 'Send again'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full bg-white text-black font-black text-2xl py-6 rounded-[2rem] uppercase italic tracking-tighter hover:bg-orange-500 hover:text-white transition-all active:scale-95 shadow-xl"
+              >
+                New Session
+              </button>
+              <button
+                onClick={handleExit}
+                className="w-full bg-neutral-900 border-2 border-white/10 text-white/60 font-black text-lg py-5 rounded-[2rem] uppercase italic tracking-tighter hover:border-red-600 hover:text-red-500 transition-all active:scale-95"
+              >
+                Exit and Close
+              </button>
+            </div>
           </div>
         )}
       </main>
