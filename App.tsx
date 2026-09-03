@@ -129,6 +129,16 @@ const App: React.FC = () => {
     window.open(`${baseUrl}&${params.toString()}`, '_blank');
   };
 
+  const skipTimer = () => {
+    // Jump to the end of any countdown (prep, pulse scan, or exercise timer)
+    AudioService.playBeep(880, 0.15);
+    if ([AppState.PULSE_BEFORE_PREP, AppState.EXERCISE_PREP, AppState.PULSE_AFTER_PREP].includes(state)) {
+      setPrepCountdown(0);
+    } else {
+      setCountdown(0);
+    }
+  };
+
   const getPrepMessage = () => {
     if (state === AppState.EXERCISE_PREP) {
       return `Preparing ${EXERCISES[currentExerciseIndex].name}...`;
@@ -148,7 +158,7 @@ const App: React.FC = () => {
             <span className="text-red-600">POWER</span>
           </h1>
         </div>
-        
+
         <div className="flex items-center gap-4">
           <div className="text-[11px] font-black bg-orange-500/10 text-orange-500 px-4 py-2 rounded-xl border border-orange-500/20 uppercase tracking-widest shadow-inner">
             Cycle {sessionCount}/3
@@ -167,7 +177,7 @@ const App: React.FC = () => {
                 Dynamic tracking and peak performance monitoring.
               </p>
             </div>
-            
+
             <button
               onClick={startInitialPulse}
               className="group relative inline-flex flex-col items-center justify-center gap-2"
@@ -222,7 +232,7 @@ const App: React.FC = () => {
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-500 to-red-600"></div>
             <h2 className="text-5xl font-black italic uppercase text-white mb-4 tracking-tighter">DATA ENTRY</h2>
             <p className="text-orange-500 font-black mb-10 uppercase tracking-widest text-sm">Enter heart beats detected in 15s</p>
-            
+
             <div className="relative group mb-10">
               <input
                 type="number"
@@ -271,7 +281,7 @@ const App: React.FC = () => {
           <div className="text-center space-y-12 p-12 md:p-20 bg-[#111] rounded-[4rem] border border-white/5 max-w-3xl w-full shadow-2xl relative overflow-hidden">
             <div className="absolute -top-20 -right-20 w-64 h-64 bg-red-600/10 blur-[100px] rounded-full"></div>
             <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-orange-600/10 blur-[100px] rounded-full"></div>
-            
+
             <div className="space-y-4">
                <h2 className="text-7xl md:text-8xl font-black italic uppercase text-white leading-[0.8] tracking-tighter">VOLTAGE <br/>CHECK</h2>
                <p className="text-2xl text-gray-400 font-medium uppercase tracking-widest">Push for Session {sessionCount + 1}?</p>
@@ -325,6 +335,15 @@ const App: React.FC = () => {
           </div>
         )}
       </main>
+
+      {[AppState.PULSE_BEFORE_PREP, AppState.PULSE_AFTER_PREP, AppState.EXERCISE_PREP, AppState.PULSE_BEFORE_COUNTDOWN, AppState.PULSE_AFTER_COUNTDOWN, AppState.EXERCISE_TIMER].includes(state) && (
+        <button
+          onClick={skipTimer}
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-neutral-900/80 border-2 border-white/25 text-white/80 font-black italic uppercase tracking-[0.25em] text-sm px-10 py-4 rounded-2xl backdrop-blur-md hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all active:scale-95 shadow-2xl"
+        >
+          Skip »
+        </button>
+      )}
 
       <footer className="p-8 text-center border-t border-white/5 bg-black/50 backdrop-blur-md">
         <p className="text-[10px] font-black uppercase tracking-[0.6em] text-neutral-700 hover:text-orange-500 transition-colors">
