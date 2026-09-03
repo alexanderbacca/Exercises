@@ -33,11 +33,11 @@ const App: React.FC = () => {
     } else if (prepCountdown === 0) {
       if (state === AppState.PULSE_BEFORE_PREP) {
         AudioService.playBeep(880, 0.5); // Start signal
-        setCountdown(15);
+        setCountdown(30);
         setState(AppState.PULSE_BEFORE_COUNTDOWN);
       } else if (state === AppState.PULSE_AFTER_PREP) {
         AudioService.playBeep(880, 0.5); // Start signal
-        setCountdown(15);
+        setCountdown(30);
         setState(AppState.PULSE_AFTER_COUNTDOWN);
       } else if (state === AppState.EXERCISE_PREP) {
         AudioService.playBeep(880, 0.5); // Start signal
@@ -285,7 +285,7 @@ const App: React.FC = () => {
                   strokeWidth="6"
                   className="text-orange-500 transition-all duration-1000 ease-linear"
                   strokeDasharray="251.2"
-                  strokeDashoffset={251.2 * (countdown / 15)}
+                  strokeDashoffset={251.2 * (countdown / 30)}
                   strokeLinecap="round"
                 />
               </svg>
@@ -302,7 +302,8 @@ const App: React.FC = () => {
           <div className="bg-[#111] p-10 md:p-16 rounded-[3.5rem] border border-white/10 shadow-[0_50px_100px_rgba(0,0,0,0.5)] w-full max-w-xl animate-in slide-in-from-bottom-12 duration-700 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-500 to-red-600"></div>
             <h2 className="text-5xl font-black italic uppercase text-white mb-4 tracking-tighter">DATA ENTRY</h2>
-            <p className="text-orange-500 font-black mb-10 uppercase tracking-widest text-sm">Enter heart beats detected in 15s</p>
+            <p className="text-orange-500 font-black mb-2 uppercase tracking-widest text-sm">Enter heart beats detected in 30s</p>
+            <p className="text-gray-500 font-bold mb-10 text-sm">Tip: beats × 2 = your BPM</p>
 
             <div className="relative group mb-10">
               <input
