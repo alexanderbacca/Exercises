@@ -29,6 +29,7 @@ export interface WorkoutSession {
   pulseBefore: number;
   pulseAfter: number;
   sessionCount: number;
+  durationMin?: number;
   date: string;
 }
 

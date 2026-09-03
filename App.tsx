@@ -18,6 +18,9 @@ const App: React.FC = () => {
     return saved > 0 ? saved : 2500;
   });
   const [customAltitude, setCustomAltitude] = useState<string>('');
+  const [altitudeReturnState, setAltitudeReturnState] = useState<AppState>(AppState.START);
+  const [workoutStartedAt, setWorkoutStartedAt] = useState<number | null>(null);
+  const [totalSeconds, setTotalSeconds] = useState<number>(0);
   const [isSending, setIsSending] = useState(false);
   const [submissions, setSubmissions] = useState<any[]>(() => {
     try {
@@ -84,7 +87,16 @@ const App: React.FC = () => {
   }, [state, countdown]);
 
   const startInitialPulse = () => {
+    setWorkoutStartedAt(Date.now());
+    setTotalSeconds(0);
     setCustomAltitude('');
+    setAltitudeReturnState(AppState.PULSE_BEFORE_PREP);
+    setState(AppState.ALTITUDE_SELECT);
+  };
+
+  const openAltitudeSelector = () => {
+    setCustomAltitude('');
+    setAltitudeReturnState(state);
     setState(AppState.ALTITUDE_SELECT);
   };
 
@@ -93,9 +105,19 @@ const App: React.FC = () => {
     if (!value || value < 0 || value > 9000) return;
     setAltitude(value);
     localStorage.setItem('ppt_altitude', value.toString());
-    setPrepCountdown(3);
-    setState(AppState.PULSE_BEFORE_PREP);
+    if (altitudeReturnState === AppState.PULSE_BEFORE_PREP) {
+      setPrepCountdown(3);
+    }
+    setState(altitudeReturnState);
   };
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const secs = (seconds % 60).toString().padStart(2, '0');
+    return `${mins}:${secs}`;
+  };
+
+  const getElapsedSeconds = () => workoutStartedAt ? Math.max(0, Math.round((Date.now() - workoutStartedAt) / 1000)) : totalSeconds;
 
   const submitPulseBefore = (val: number) => {
     if (!val) return;
@@ -135,6 +157,7 @@ const App: React.FC = () => {
   const submitPulseAfter = (val: number) => {
     if (!val) return;
     setPulseAfter(val);
+    setTotalSeconds(getElapsedSeconds());
     setState(AppState.FINAL_SUMMARY);
   };
 
@@ -144,6 +167,7 @@ const App: React.FC = () => {
     const params = new URLSearchParams({
       'entry.1646637161': rec.date,
       'entry.1753122030': rec.altitude.toString(),
+      'entry.1184196909': rec.durationMin.toFixed(1),
       'entry.514818379': rec.pulseBefore.toString(),
       'entry.1947971010': rec.pulseAfter.toString(),
       'entry.185983801': rec.sessions
@@ -170,6 +194,8 @@ const App: React.FC = () => {
       id: Date.now(),
       date: new Date().toISOString().split('T')[0],
       altitude,
+      totalSeconds,
+      durationMin: Number((totalSeconds / 60).toFixed(1)),
       pulseBefore,
       pulseAfter,
       sessions: `${sessionCount} Session${sessionCount > 1 ? 's' : ''}`,
@@ -248,7 +274,7 @@ const App: React.FC = () => {
 
         <div className="flex items-center gap-4">
           <button
-            onClick={() => setState(AppState.ALTITUDE_SELECT)}
+            onClick={openAltitudeSelector}
             className="text-[11px] font-black bg-white/5 text-white/70 px-4 py-2 rounded-xl border border-white/10 uppercase tracking-widest hover:bg-orange-500/20 hover:text-orange-400 hover:border-orange-500/30 transition-all"
             title="Change training altitude"
           >
@@ -461,11 +487,12 @@ const App: React.FC = () => {
                 <p className="text-orange-500 font-black uppercase tracking-[0.4em] text-sm">Session Data Synchronized</p>
              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
               {[
                 { label: 'Baseline', value: pulseBefore, color: 'text-white' },
                 { label: 'Post-Ex', value: pulseAfter, color: 'text-red-600' },
-                { label: 'Rounds', value: sessionCount, color: 'text-orange-500' }
+                { label: 'Rounds', value: sessionCount, color: 'text-orange-500' },
+                { label: 'Total Time', value: formatDuration(totalSeconds), color: 'text-orange-500' }
               ].map((item, idx) => (
                 <div key={idx} className="bg-neutral-900/40 p-10 rounded-[3rem] border border-white/5 backdrop-blur-xl group hover:border-white/20 transition-all">
                   <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] mb-4">{item.label}</p>
@@ -505,7 +532,7 @@ const App: React.FC = () => {
                     <div key={r.id} className="flex items-center justify-between gap-4 bg-black/40 border border-white/5 rounded-2xl px-6 py-4">
                       <div className="min-w-0">
                         <p className="text-white font-black italic truncate">{r.date} · {r.sessions}</p>
-                        <p className="text-xs text-gray-400 font-bold">Pulse {r.pulseBefore} → {r.pulseAfter} <span className="text-orange-500/80">· {r.altitude || '?'} m</span></p>
+                        <p className="text-xs text-gray-400 font-bold">Pulse {r.pulseBefore} → {r.pulseAfter} <span className="text-orange-500/80">· {r.altitude || '?'} m · ⏱ {typeof r.durationMin === 'number' ? r.durationMin.toFixed(1) : '?'} min</span></p>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
                         <span className={`text-[10px] font-black uppercase tracking-widest ${r.status === 'sent' ? 'text-green-500' : 'text-orange-500'}`}>
