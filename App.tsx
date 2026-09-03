@@ -13,6 +13,11 @@ const App: React.FC = () => {
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState<number>(0);
   const [countdown, setCountdown] = useState<number>(15);
   const [prepCountdown, setPrepCountdown] = useState<number>(3);
+  const [altitude, setAltitude] = useState<number>(() => {
+    const saved = Number(localStorage.getItem('ppt_altitude'));
+    return saved > 0 ? saved : 2500;
+  });
+  const [customAltitude, setCustomAltitude] = useState<string>('');
   const [isSending, setIsSending] = useState(false);
   const [submissions, setSubmissions] = useState<any[]>(() => {
     try {
@@ -79,6 +84,15 @@ const App: React.FC = () => {
   }, [state, countdown]);
 
   const startInitialPulse = () => {
+    setCustomAltitude('');
+    setState(AppState.ALTITUDE_SELECT);
+  };
+
+  const chooseAltitude = (meters: number) => {
+    const value = Math.round(meters);
+    if (!value || value < 0 || value > 9000) return;
+    setAltitude(value);
+    localStorage.setItem('ppt_altitude', value.toString());
     setPrepCountdown(3);
     setState(AppState.PULSE_BEFORE_PREP);
   };
@@ -129,6 +143,7 @@ const App: React.FC = () => {
   const sendToGoogleForm = async (rec: any) => {
     const params = new URLSearchParams({
       'entry.1646637161': rec.date,
+      'entry.1753122030': rec.altitude.toString(),
       'entry.514818379': rec.pulseBefore.toString(),
       'entry.1947971010': rec.pulseAfter.toString(),
       'entry.185983801': rec.sessions
@@ -154,6 +169,7 @@ const App: React.FC = () => {
     const rec: any = {
       id: Date.now(),
       date: new Date().toISOString().split('T')[0],
+      altitude,
       pulseBefore,
       pulseAfter,
       sessions: `${sessionCount} Session${sessionCount > 1 ? 's' : ''}`,
@@ -231,6 +247,13 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => setState(AppState.ALTITUDE_SELECT)}
+            className="text-[11px] font-black bg-white/5 text-white/70 px-4 py-2 rounded-xl border border-white/10 uppercase tracking-widest hover:bg-orange-500/20 hover:text-orange-400 hover:border-orange-500/30 transition-all"
+            title="Change training altitude"
+          >
+            {altitude} m
+          </button>
           <div className="text-[11px] font-black bg-orange-500/10 text-orange-500 px-4 py-2 rounded-xl border border-orange-500/20 uppercase tracking-widest shadow-inner">
             Cycle {sessionCount}/3
           </div>
@@ -259,6 +282,60 @@ const App: React.FC = () => {
               </div>
               <span className="text-[10px] font-black text-orange-500 uppercase tracking-[0.4em] mt-4 opacity-50 group-hover:opacity-100 transition-opacity">Initialize Session</span>
             </button>
+          </div>
+        )}
+
+        {state === AppState.ALTITUDE_SELECT && (
+          <div className="w-full max-w-2xl bg-[#111] p-8 md:p-12 rounded-[3.5rem] border border-white/10 shadow-[0_50px_100px_rgba(0,0,0,0.5)] animate-in slide-in-from-bottom-12 duration-500 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-500 to-red-600"></div>
+            <div className="text-center mb-10">
+              <p className="text-orange-500 font-black uppercase tracking-[0.4em] text-[10px] mb-4">Training conditions</p>
+              <h2 className="text-5xl md:text-6xl font-black italic uppercase text-white tracking-tighter leading-none">Where are you<br/>training?</h2>
+              <p className="text-gray-400 mt-5 font-medium">Altitude helps you compare your pulse data fairly.</p>
+            </div>
+
+            <div className="space-y-4">
+              <button
+                onClick={() => chooseAltitude(2500)}
+                className={`w-full p-6 rounded-3xl border-2 text-left transition-all active:scale-[0.98] ${altitude === 2500 ? 'bg-orange-500 border-orange-400 text-white shadow-[0_15px_40px_rgba(249,115,22,0.25)]' : 'bg-black/40 border-white/10 hover:border-orange-500/50 text-white'}`}
+              >
+                <span className="block text-3xl font-black italic uppercase tracking-tighter">Pasto</span>
+                <span className="block mt-1 text-sm font-black uppercase tracking-[0.2em] opacity-70">2500 m</span>
+              </button>
+              <button
+                onClick={() => chooseAltitude(1500)}
+                className={`w-full p-6 rounded-3xl border-2 text-left transition-all active:scale-[0.98] ${altitude === 1500 ? 'bg-orange-500 border-orange-400 text-white shadow-[0_15px_40px_rgba(249,115,22,0.25)]' : 'bg-black/40 border-white/10 hover:border-orange-500/50 text-white'}`}
+              >
+                <span className="block text-3xl font-black italic uppercase tracking-tighter">Sotomayor</span>
+                <span className="block mt-1 text-sm font-black uppercase tracking-[0.2em] opacity-70">1500 m</span>
+              </button>
+
+              <div className="bg-black/40 border border-white/10 rounded-3xl p-5">
+                <label className="block text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mb-3">Other altitude</label>
+                <div className="flex gap-3">
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    max="9000"
+                    placeholder="Meters"
+                    value={customAltitude}
+                    onChange={(e) => setCustomAltitude(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') chooseAltitude(Number(customAltitude));
+                    }}
+                    className="min-w-0 flex-1 bg-neutral-900 border-2 border-white/5 text-white font-black text-xl p-4 rounded-2xl focus:border-orange-500 focus:ring-4 focus:ring-orange-500/20 transition-all outline-none"
+                  />
+                  <button
+                    onClick={() => chooseAltitude(Number(customAltitude))}
+                    disabled={!customAltitude || Number(customAltitude) < 0 || Number(customAltitude) > 9000}
+                    className="bg-white text-black font-black uppercase italic px-6 rounded-2xl hover:bg-orange-500 hover:text-white transition-all active:scale-95 disabled:opacity-30"
+                  >
+                    Go
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -428,7 +505,7 @@ const App: React.FC = () => {
                     <div key={r.id} className="flex items-center justify-between gap-4 bg-black/40 border border-white/5 rounded-2xl px-6 py-4">
                       <div className="min-w-0">
                         <p className="text-white font-black italic truncate">{r.date} · {r.sessions}</p>
-                        <p className="text-xs text-gray-400 font-bold">Pulse {r.pulseBefore} → {r.pulseAfter}</p>
+                        <p className="text-xs text-gray-400 font-bold">Pulse {r.pulseBefore} → {r.pulseAfter} <span className="text-orange-500/80">· {r.altitude || '?'} m</span></p>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
                         <span className={`text-[10px] font-black uppercase tracking-widest ${r.status === 'sent' ? 'text-green-500' : 'text-orange-500'}`}>
