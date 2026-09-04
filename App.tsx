@@ -115,6 +115,14 @@ const App: React.FC = () => {
     return () => clearInterval(timer);
   }, [state, recoveryCountdown]);
 
+  // Voice announcement: say the exercise name and repetitions
+  useEffect(() => {
+    const ex = EXERCISES[currentExerciseIndex];
+    if (state === AppState.EXERCISE_PREP || (state === AppState.EXERCISE_LOOP && !ex.duration)) {
+      speak(`${ex.name}. ${ex.reps.replace('-', ' to ')}`);
+    }
+  }, [state, currentExerciseIndex]);
+
   const startInitialPulse = () => {
     setWorkoutStartedAt(Date.now());
     setTotalSeconds(0);
@@ -290,10 +298,13 @@ const App: React.FC = () => {
   };
 
   const skipTimer = () => {
-    // Jump to the end of any countdown (prep, pulse scan, or exercise timer)
+    // Jump to the end of any countdown (prep, pulse scan, exercise timer, or rest)
     AudioService.playBeep(880, 0.15);
     if ([AppState.PULSE_BEFORE_PREP, AppState.EXERCISE_PREP, AppState.PULSE_AFTER_PREP].includes(state)) {
       setPrepCountdown(0);
+    } else if (state === AppState.RECOVERY_WAIT) {
+      try { window.speechSynthesis.cancel(); } catch (e) {}
+      setRecoveryCountdown(0);
     } else {
       setCountdown(0);
     }
@@ -518,6 +529,7 @@ const App: React.FC = () => {
                 ONE MORE
               </button>
               <button
+               
                 onClick={() => handleSessionDecision(false)}
                 className="flex-1 bg-white text-black py-8 px-10 rounded-[2.5rem] font-black text-3xl uppercase italic tracking-tighter hover:bg-neutral-200 transition-all hover:scale-105 shadow-xl"
               >
@@ -662,7 +674,7 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {[AppState.PULSE_BEFORE_PREP, AppState.PULSE_AFTER_PREP, AppState.EXERCISE_PREP, AppState.PULSE_BEFORE_COUNTDOWN, AppState.PULSE_AFTER_COUNTDOWN, AppState.EXERCISE_TIMER].includes(state) && (
+      {([AppState.PULSE_BEFORE_PREP, AppState.PULSE_AFTER_PREP, AppState.EXERCISE_PREP, AppState.PULSE_BEFORE_COUNTDOWN, AppState.PULSE_AFTER_COUNTDOWN, AppState.EXERCISE_TIMER].includes(state) || (state === AppState.RECOVERY_WAIT && recoveryCountdown > 0)) && (
         <button
           onClick={skipTimer}
           className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-neutral-900/80 border-2 border-white/25 text-white/80 font-black italic uppercase tracking-[0.25em] text-sm px-10 py-4 rounded-2xl backdrop-blur-md hover:bg-orange-500 hover:text-white hover:border-orange-500 transition-all active:scale-95 shadow-2xl"
