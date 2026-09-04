@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { AppState } from './types';
 import { EXERCISES } from './constants';
@@ -9,6 +8,9 @@ const App: React.FC = () => {
   const [state, setState] = useState<AppState>(AppState.START);
   const [pulseBefore, setPulseBefore] = useState<number>(0);
   const [pulseAfter, setPulseAfter] = useState<number>(0);
+  const [pulseRecovery, setPulseRecovery] = useState<number>(0);
+  const [isRecovery, setIsRecovery] = useState<boolean>(false);
+  const [recoveryCountdown, setRecoveryCountdown] = useState<number>(60);
   const [sessionCount, setSessionCount] = useState<number>(1);
   const [currentExerciseIndex, setCurrentExerciseIndex] = useState<number>(0);
   const [countdown, setCountdown] = useState<number>(15);
@@ -86,6 +88,33 @@ const App: React.FC = () => {
     return () => clearInterval(timer);
   }, [state, countdown]);
 
+  const speak = (text: string) => {
+    try {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = 'en-US';
+      window.speechSynthesis.speak(utterance);
+    } catch (e) {
+      // Speech synthesis not available on this device
+    }
+  };
+
+  // Recovery wait timer logic (60 seconds) with voice guidance
+  useEffect(() => {
+    let timer: any;
+    if (state === AppState.RECOVERY_WAIT && recoveryCountdown > 0) {
+      if (recoveryCountdown === 60) speak('Rest for one minute');
+      else if (recoveryCountdown === 30) speak('Thirty seconds');
+      else if (recoveryCountdown === 10) speak('Get ready');
+      timer = setInterval(() => {
+        setRecoveryCountdown((prev) => prev - 1);
+      }, 1000);
+    } else if (state === AppState.RECOVERY_WAIT && recoveryCountdown === 0) {
+      AudioService.playBeep(880, 1.5); // Long beep: rest minute is over
+    }
+    return () => clearInterval(timer);
+  }, [state, recoveryCountdown]);
+
   const startInitialPulse = () => {
     setWorkoutStartedAt(Date.now());
     setTotalSeconds(0);
@@ -156,9 +185,23 @@ const App: React.FC = () => {
 
   const submitPulseAfter = (val: number) => {
     if (!val) return;
+    if (isRecovery) {
+      // Second pass: this input is the 1-minute recovery pulse
+      setPulseRecovery(val);
+      setIsRecovery(false);
+      setState(AppState.FINAL_SUMMARY);
+      return;
+    }
     setPulseAfter(val);
     setTotalSeconds(getElapsedSeconds());
-    setState(AppState.FINAL_SUMMARY);
+    setRecoveryCountdown(60);
+    setState(AppState.RECOVERY_WAIT);
+  };
+
+  const startRecoveryMeasurement = () => {
+    setIsRecovery(true);
+    setPrepCountdown(3);
+    setState(AppState.PULSE_AFTER_PREP); // Reuses the normal 3s prep → 30s scan → input flow
   };
 
   const FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSeM3r6WtXCYD7nzH6RMCfXAriTnWT9fXWh-1JQPWZjHvyCOcg/formResponse';
@@ -170,6 +213,7 @@ const App: React.FC = () => {
       'entry.1184196909': rec.durationMin.toFixed(1),
       'entry.514818379': rec.pulseBefore.toString(),
       'entry.1947971010': rec.pulseAfter.toString(),
+      'entry.856426932': rec.pulseRecovery != null ? rec.pulseRecovery.toString() : '',
       'entry.185983801': rec.sessions
     });
     // Silent background submit: Google Forms saves the data but hides the response (no-cors)
@@ -198,6 +242,7 @@ const App: React.FC = () => {
       durationMin: Number((totalSeconds / 60).toFixed(1)),
       pulseBefore,
       pulseAfter,
+      pulseRecovery,
       sessions: `${sessionCount} Session${sessionCount > 1 ? 's' : ''}`,
       status: 'pending',
       sending: false
@@ -238,6 +283,8 @@ const App: React.FC = () => {
       setSessionCount(1);
       setPulseBefore(0);
       setPulseAfter(0);
+      setPulseRecovery(0);
+      setIsRecovery(false);
       setState(AppState.START);
     }, 400);
   };
@@ -480,6 +527,47 @@ const App: React.FC = () => {
           </div>
         )}
 
+        {state === AppState.RECOVERY_WAIT && (
+          <div className="text-center space-y-16 animate-in fade-in duration-500">
+            <h2 className="text-5xl font-black italic uppercase text-orange-500 tracking-tighter">RECOVERY</h2>
+            {recoveryCountdown > 0 ? (
+              <>
+                <div className="relative w-72 h-72 md:w-96 md:h-96 mx-auto flex items-center justify-center">
+                  <div className="absolute inset-0 border-[20px] border-white/5 rounded-full"></div>
+                  <svg className="absolute inset-0 w-full h-full -rotate-90 transform" viewBox="0 0 100 100">
+                    <circle
+                      cx="50" cy="50" r="40"
+                      fill="transparent"
+                      stroke="currentColor"
+                      strokeWidth="6"
+                      className="text-orange-500 transition-all duration-1000 ease-linear"
+                      strokeDasharray="251.2"
+                      strokeDashoffset={251.2 * (recoveryCountdown / 60)}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <div className="relative flex flex-col items-center">
+                    <span className="text-[10rem] md:text-[14rem] font-black italic text-white leading-none drop-shadow-2xl">{recoveryCountdown}</span>
+                    <span className="text-xs font-black text-orange-500 uppercase tracking-[0.5em] -mt-4 opacity-50">Seconds Rest</span>
+                  </div>
+                </div>
+                <p className="text-2xl text-gray-400 font-black uppercase tracking-[0.2em] italic animate-pulse">Rest and breathe...</p>
+              </>
+            ) : (
+              <button
+                onClick={startRecoveryMeasurement}
+                className="group relative inline-flex flex-col items-center justify-center gap-2"
+              >
+                <div className="absolute inset-0 bg-orange-600 blur-3xl opacity-20 group-hover:opacity-40 transition-opacity"></div>
+                <div className="relative bg-white text-black font-black text-3xl py-8 px-16 rounded-[2.5rem] uppercase italic tracking-tighter transition-all shadow-[0_20px_50px_rgba(249,115,22,0.3)] group-hover:scale-105 group-active:scale-95 group-hover:bg-orange-500 group-hover:text-white animate-pulse">
+                  Measure Recovery Pulse
+                </div>
+                <span className="text-[10px] font-black text-orange-500 uppercase tracking-[0.4em] mt-4 opacity-50 group-hover:opacity-100 transition-opacity">1-Minute Recovery</span>
+              </button>
+            )}
+          </div>
+        )}
+
         {state === AppState.FINAL_SUMMARY && (
           <div className="text-center space-y-12 w-full animate-in fade-in zoom-in duration-1000 max-w-4xl">
              <div className="space-y-4">
@@ -487,16 +575,20 @@ const App: React.FC = () => {
                 <p className="text-orange-500 font-black uppercase tracking-[0.4em] text-sm">Session Data Synchronized</p>
              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-              {[
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
+              {([
                 { label: 'Baseline', value: pulseBefore, color: 'text-white' },
                 { label: 'Post-Ex', value: pulseAfter, color: 'text-red-600' },
+                { label: 'Recovery', value: pulseRecovery, color: 'text-green-500', sub: pulseRecovery - pulseAfter },
                 { label: 'Rounds', value: sessionCount, color: 'text-orange-500' },
                 { label: 'Total Time', value: formatDuration(totalSeconds), color: 'text-orange-500' }
-              ].map((item, idx) => (
+              ] as { label: string; value: React.ReactNode; color: string; sub?: number }[]).map((item, idx) => (
                 <div key={idx} className="bg-neutral-900/40 p-10 rounded-[3rem] border border-white/5 backdrop-blur-xl group hover:border-white/20 transition-all">
                   <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.4em] mb-4">{item.label}</p>
                   <p className={`text-7xl font-black italic ${item.color} group-hover:scale-110 transition-transform`}>{item.value}</p>
+                  {item.sub !== undefined && (
+                    <p className="text-sm font-black text-gray-500 mt-2">{item.sub > 0 ? '+' : ''}{item.sub}</p>
+                  )}
                 </div>
               ))}
             </div>
@@ -532,7 +624,7 @@ const App: React.FC = () => {
                     <div key={r.id} className="flex items-center justify-between gap-4 bg-black/40 border border-white/5 rounded-2xl px-6 py-4">
                       <div className="min-w-0">
                         <p className="text-white font-black italic truncate">{r.date} · {r.sessions}</p>
-                        <p className="text-xs text-gray-400 font-bold">Pulse {r.pulseBefore} → {r.pulseAfter} <span className="text-orange-500/80">· {r.altitude || '?'} m · ⏱ {typeof r.durationMin === 'number' ? r.durationMin.toFixed(1) : '?'} min</span></p>
+                        <p className="text-xs text-gray-400 font-bold">Pulse {r.pulseBefore} → {r.pulseAfter}{r.pulseRecovery != null ? ` → ${r.pulseRecovery}` : ''} <span className="text-orange-500/80">· {r.altitude || '?'} m · ⏱ {typeof r.durationMin === 'number' ? r.durationMin.toFixed(1) : '?'} min</span></p>
                       </div>
                       <div className="flex items-center gap-3 shrink-0">
                         <span className={`text-[10px] font-black uppercase tracking-widest ${r.status === 'sent' ? 'text-green-500' : 'text-orange-500'}`}>
