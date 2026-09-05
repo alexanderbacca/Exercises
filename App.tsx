@@ -3,7 +3,7 @@ import { ExerciseCard } from './components/ExerciseCard';
 import { ApiKeyChecker } from './components/ApiKeyChecker';
 import { exercises } from './constants';
 import { SubmissionData, Exercise } from './types';
-import { playSuccessSound, playClickSound } from './services/audio';
+import { AudioService } from './services/audio';
 
 // Google Forms endpoint
 const GOOGLE_FORMS_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSeM3r6WtXCYD7nzH6RMCfXAriTnWT9fXWh-1JQPWZjHvyCOcg/formResponse';
@@ -49,6 +49,9 @@ const formatDateSafe = (date: string, options: Intl.DateTimeFormatOptions): stri
   const parsed = new Date(date);
   return Number.isNaN(parsed.getTime()) ? '\u2014' : parsed.toLocaleDateString('en-US', options);
 };
+// Reuse the existing AudioService for click and successful-save feedback
+const playClickSound = () => AudioService.playBeep(700, 0.08);
+const playSuccessSound = () => AudioService.playBeep(1047, 0.35);
 
 const App: React.FC = () => {
   const [screen, setScreen] = useState<'START' | 'LOCATION' | 'EXERCISE'>('START');
