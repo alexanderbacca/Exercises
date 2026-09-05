@@ -10,8 +10,14 @@ const ApiKeyChecker: React.FC<ApiKeyCheckerProps> = ({ onValidated }) => {
 
   useEffect(() => {
     const checkKey = async () => {
-      // @ts-ignore
-      const hasKey = await window.aistudio.hasSelectedApiKey();
+const hasSelectedApiKey = window.aistudio?.hasSelectedApiKey;
+
+if (typeof hasSelectedApiKey !== 'function') {
+  onValidated();
+  return;
+}
+
+const hasKey = await hasSelectedApiKey();
       if (hasKey) {
         onValidated();
       } else {
