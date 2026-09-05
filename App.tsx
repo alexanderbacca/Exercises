@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ExerciseCard } from './components/ExerciseCard';
 import { ApiKeyChecker } from './components/ApiKeyChecker';
-import { exercises } from './constants';
+import { EXERCISES as exercises } from './constants';
 import { SubmissionData, Exercise } from './types';
 import { AudioService } from './services/audio';
 
