@@ -6,7 +6,7 @@ import { SubmissionData, Exercise } from './types';
 import { playSuccessSound, playClickSound } from './services/audio';
 
 // Google Forms endpoint
-const GOOGLE_FORMS_URL = 'https://docs.google.com/forms/d/e/YOUR_FORM_ID/formResponse';
+const GOOGLE_FORMS_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSeM3r6WtXCYD7nzH6RMCfXAriTnWT9fXWh-1JQPWZjHvyCOcg/formResponse';
 
 interface HistoryEntry {
   date: string;
@@ -137,13 +137,13 @@ const App: React.FC = () => {
     // Send to Google Forms (silent)
     try {
       const formData = new FormData();
-      formData.append('entry.exercise', submissionData.exercise);
-      formData.append('entry.pulseBefore', submissionData.pulseBefore.toString());
-      formData.append('entry.pulseAfter', submissionData.pulseAfter.toString());
-      formData.append('entry.recoveryPulse', submissionData.recoveryPulse.toString());
-      formData.append('entry.altitude', submissionData.altitude.toString());
-      formData.append('entry.durationMin', submissionData.durationMin.toString());
-      formData.append('entry.timestamp', submissionData.timestamp);
+      formData.append('entry.1184196909', submissionData.pulseBefore.toString());
+      formData.append('entry.514818379', submissionData.pulseAfter.toString());
+      formData.append('entry.856426932', submissionData.recoveryPulse.toString());
+      formData.append('entry.1753122030', submissionData.altitude.toString());
+      formData.append('entry.1947971010', submissionData.durationMin.toString());
+      formData.append('entry.1646637161', submissionData.timestamp);
+      formData.append('entry.185983801', '1 Session');
 
       await fetch(GOOGLE_FORMS_URL, {
         method: 'POST',
