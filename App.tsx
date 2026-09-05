@@ -6,7 +6,7 @@ import { SubmissionData, Exercise } from './types';
 import { playSuccessSound, playClickSound } from './services/audio';
 
 // Google Forms endpoint
-const GOOGLE_FORMS_URL = 'https://docs.google.com/forms/d/e/YOUR_FORM_ID/formResponse';
+const GOOGLE_FORMS_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSeM3r6WtXCYD7nzH6RMCfXAriTnWT9fXWh-1JQPWZjHvyCOcg/formResponse';
 
 interface HistoryEntry {
   date: string;
@@ -16,6 +16,39 @@ interface HistoryEntry {
   altitude: number;
   durationMin: number;
 }
+
+// Type guard: only finite numbers are safe for SVG math
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+
+// Defensive normalization of ppt_history: corrupted or missing data never crashes the app
+const sanitizeHistory = (raw: unknown): HistoryEntry[] => {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((entry): entry is Record<string, unknown> => typeof entry === 'object' && entry !== null)
+    .map((entry) => ({
+      date: typeof entry.date === 'string' ? entry.date : '',
+      pulseBefore: Number(entry.pulseBefore),
+      pulseAfter: Number(entry.pulseAfter),
+      recoveryPulse: Number(entry.recoveryPulse),
+      altitude: Number(entry.altitude),
+      durationMin: Number(entry.durationMin),
+    }))
+    .filter(
+      (entry) =>
+        isFiniteNumber(entry.pulseBefore) &&
+        isFiniteNumber(entry.pulseAfter) &&
+        isFiniteNumber(entry.recoveryPulse) &&
+        isFiniteNumber(entry.altitude) &&
+        isFiniteNumber(entry.durationMin)
+    );
+};
+
+// Format a date safely; invalid dates render as a dash instead of "Invalid Date"
+const formatDateSafe = (date: string, options: Intl.DateTimeFormatOptions): string => {
+  const parsed = new Date(date);
+  return Number.isNaN(parsed.getTime()) ? '\u2014' : parsed.toLocaleDateString('en-US', options);
+};
 
 const App: React.FC = () => {
   const [screen, setScreen] = useState<'START' | 'LOCATION' | 'EXERCISE'>('START');
@@ -29,15 +62,16 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const pulseInputRef = useRef<HTMLInputElement>(null);
 
-  // Load history on mount
+  // Load history on mount (defensive: corrupted or missing ppt_history never crashes the app)
   useEffect(() => {
-    const savedHistory = localStorage.getItem('ppt_history');
-    if (savedHistory) {
-      try {
-        setHistory(JSON.parse(savedHistory));
-      } catch (e) {
-        console.error('Failed to parse history:', e);
+    try {
+      const savedHistory = localStorage.getItem('ppt_history');
+      if (savedHistory) {
+        setHistory(sanitizeHistory(JSON.parse(savedHistory)));
       }
+    } catch (e) {
+      console.error('Failed to parse history:', e);
+      setHistory([]);
     }
   }, []);
 
@@ -103,13 +137,13 @@ const App: React.FC = () => {
     // Send to Google Forms (silent)
     try {
       const formData = new FormData();
-      formData.append('entry.exercise', submissionData.exercise);
-      formData.append('entry.pulseBefore', submissionData.pulseBefore.toString());
-      formData.append('entry.pulseAfter', submissionData.pulseAfter.toString());
-      formData.append('entry.recoveryPulse', submissionData.recoveryPulse.toString());
-      formData.append('entry.altitude', submissionData.altitude.toString());
-      formData.append('entry.durationMin', submissionData.durationMin.toString());
-      formData.append('entry.timestamp', submissionData.timestamp);
+      formData.append('entry.1184196909', submissionData.pulseBefore.toString());
+      formData.append('entry.514818379', submissionData.pulseAfter.toString());
+      formData.append('entry.856426932', submissionData.recoveryPulse.toString());
+      formData.append('entry.1753122030', submissionData.altitude.toString());
+      formData.append('entry.1947971010', submissionData.durationMin.toString());
+      formData.append('entry.1646637161', submissionData.timestamp);
+      formData.append('entry.185983801', '1 Session');
 
       await fetch(GOOGLE_FORMS_URL, {
         method: 'POST',
@@ -141,42 +175,62 @@ const App: React.FC = () => {
 
   // Render progress chart
   const renderProgressChart = () => {
-    if (history.length === 0) {
+    // Only sessions with usable numeric pulses can be drawn
+    const validHistory = history.filter(
+      (s) => isFiniteNumber(s.pulseBefore) && isFiniteNumber(s.pulseAfter)
+    );
+
+    if (validHistory.length === 0) {
       return (
         <div className="bg-gray-800 rounded-xl p-6 text-center border border-gray-700">
           <p className="text-orange-400 font-semibold text-lg">Your evolution starts with the first session</p>
-          <p className="text-gray-400 text-sm mt-2">Track your pulse recovery over time</p>
+          <p className="text-gray-400 text-sm mt-2">Track your progress one session at a time.</p>
         </div>
       );
     }
 
-    const last15Sessions = history.slice(-15);
+    const last15Sessions = validHistory.slice(-15);
     const width = 320;
     const height = 160;
     const padding = 30;
     const chartWidth = width - padding * 2;
     const chartHeight = height - padding * 2;
 
+    // Every pulse here is finite; the +/-5 padding guarantees a non-zero
+    // range even when all sessions share identical values
     const allPulses = last15Sessions.flatMap(s => [s.pulseBefore, s.pulseAfter]);
     const minPulse = Math.min(...allPulses) - 5;
     const maxPulse = Math.max(...allPulses) + 5;
 
-    const getX = (index: number) => padding + (index / (last15Sessions.length - 1 || 1)) * chartWidth;
-    const getY = (pulse: number) => padding + chartHeight - ((pulse - minPulse) / (maxPulse - minPulse)) * chartHeight;
+    // One session is centered; two or more are spaced evenly
+    const getX = (index: number) =>
+      last15Sessions.length === 1
+        ? padding + chartWidth / 2
+        : padding + (index / (last15Sessions.length - 1)) * chartWidth;
+    const getY = (pulse: number) => {
+      const y = padding + chartHeight - ((pulse - minPulse) / (maxPulse - minPulse)) * chartHeight;
+      // Never emit NaN or Infinity into the SVG
+      return Number.isFinite(y) ? y : padding + chartHeight / 2;
+    };
 
     const beforePoints = last15Sessions.map((s, i) => `${getX(i)},${getY(s.pulseBefore)}`).join(' ');
     const afterPoints = last15Sessions.map((s, i) => `${getX(i)},${getY(s.pulseAfter)}`).join(' ');
 
-    // Calculate stats
+    // Stats: total length of ppt_history and lowest valid pulseAfter with its date
     const totalSessions = history.length;
-    const bestSession = history.reduce((best, current) => 
-      current.pulseAfter < best.pulseAfter ? current : best, history[0]
-    );
-    const bestDate = new Date(bestSession.date).toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric',
-      year: '2-digit'
-    });
+    const validAfter = history.filter((s) => isFiniteNumber(s.pulseAfter));
+    const bestSession = validAfter.length > 0
+      ? validAfter.reduce((best, current) =>
+          current.pulseAfter < best.pulseAfter ? current : best, validAfter[0]
+        )
+      : null;
+    const bestDate = bestSession
+      ? formatDateSafe(bestSession.date, {
+          month: 'short',
+          day: 'numeric',
+          year: '2-digit'
+        })
+      : '';
 
     return (
       <div className="bg-gray-800 rounded-xl p-4 border border-gray-700">
@@ -254,7 +308,7 @@ const App: React.FC = () => {
           {/* X-axis labels (dates) */}
           {last15Sessions.map((s, i) => {
             if (i % Math.ceil(last15Sessions.length / 5) === 0 || i === last15Sessions.length - 1) {
-              const date = new Date(s.date).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' });
+              const date = formatDateSafe(s.date, { month: 'numeric', day: 'numeric' });
               return (
                 <text
                   key={i}
@@ -299,7 +353,13 @@ const App: React.FC = () => {
           </div>
           <div className="text-center">
             <p className="text-gray-400 text-xs">Best Pulse After</p>
-            <p className="text-white font-bold text-lg">{bestSession.pulseAfter} <span className="text-gray-500 text-sm">({bestDate})</span></p>
+            <p className="text-white font-bold text-lg">
+              {bestSession ? (
+                <>{bestSession.pulseAfter} <span className="text-gray-500 text-sm">({bestDate})</span></>
+              ) : (
+                '\u2014'
+              )}
+            </p>
           </div>
         </div>
       </div>
