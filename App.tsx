@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ExerciseCard } from './components/ExerciseCard';
+import ExerciseCard from './components/ExerciseCard';
 import ApiKeyChecker from './components/ApiKeyChecker';
 import { EXERCISES as exercises } from './constants';
 import { SubmissionData, Exercise } from './types';
