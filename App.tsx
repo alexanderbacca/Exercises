@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ExerciseCard } from './components/ExerciseCard';
-import { ApiKeyChecker } from './components/ApiKeyChecker';
+import ApiKeyChecker from './components/ApiKeyChecker';
 import { exercises } from './constants';
 import { SubmissionData, Exercise } from './types';
 import { AudioService } from './services/audio';
@@ -371,7 +371,7 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4">
-      <ApiKeyChecker />
+      <ApiKeyChecker onValidated={() => {}} />
 
       {screen === 'START' && (
         <div className="max-w-md mx-auto space-y-6">
