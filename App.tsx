@@ -59,7 +59,11 @@ const App: React.FC = () => {
   const [pulseBefore, setPulseBefore] = useState<number | null>(null);
   const [pulseAfter, setPulseAfter] = useState<number | null>(null);
   const [recoveryPulse, setRecoveryPulse] = useState<number | null>(null);
-  const [altitude, setAltitude] = useState<number>(0);
+  const [altitude, setAltitude] = useState<number>(() => {
+  const saved = Number(localStorage.getItem('ppt_altitude'));
+  return saved > 0 ? saved : 2500;
+});
+const [customAltitude, setCustomAltitude] = useState<string>('');
   const [durationMin, setDurationMin] = useState<number>(0);
   const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
@@ -396,14 +400,116 @@ const App: React.FC = () => {
       )}
 
       {screen === 'LOCATION' && (
-        <div className="max-w-md mx-auto">
-          <div className="bg-gray-800 rounded-xl p-6 text-center">
-            <h2 className="text-2xl font-bold mb-4">Getting Location...</h2>
-            <p className="text-gray-400">Please allow location access to track your altitude</p>
+  <div className="max-w-md mx-auto">
+    <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+      <div className="text-center mb-6">
+        <p className="text-orange-400 font-semibold uppercase tracking-wider text-xs mb-2">
+          Training conditions
+        </p>
+        <h2 className="text-3xl font-bold mb-3">Where are you training?</h2>
+        <p className="text-gray-400">
+          Choose an altitude to compare your pulse data fairly.
+        </p>
+      </div>
+
+      <div className="space-y-3">
+        <button
+          onClick={() => {
+            playClickSound();
+            setAltitude(2500);
+            localStorage.setItem('ppt_altitude', '2500');
+            setScreen('EXERCISE');
+          }}
+          className="w-full rounded-xl border border-orange-500 bg-orange-500/10 p-5 text-left transition-colors hover:bg-orange-500 hover:text-white"
+        >
+          <span className="block text-2xl font-bold">Pasto</span>
+          <span className="block mt-1 text-sm text-orange-300">2,500 m</span>
+        </button>
+
+        <button
+          onClick={() => {
+            playClickSound();
+            setAltitude(1500);
+            localStorage.setItem('ppt_altitude', '1500');
+            setScreen('EXERCISE');
+          }}
+          className="w-full rounded-xl border border-gray-600 bg-gray-900 p-5 text-left transition-colors hover:border-orange-500 hover:bg-orange-500/10"
+        >
+          <span className="block text-2xl font-bold">Sotomayor</span>
+          <span className="block mt-1 text-sm text-gray-400">1,500 m</span>
+        </button>
+
+        <div className="rounded-xl border border-gray-600 bg-gray-900 p-4">
+          <label
+            htmlFor="custom-altitude"
+            className="mb-3 block text-sm font-semibold text-gray-300"
+          >
+            Other altitude
+          </label>
+
+          <div className="flex gap-3">
+            <input
+              id="custom-altitude"
+              type="number"
+              inputMode="numeric"
+              min="0"
+              max="9000"
+              placeholder="Meters"
+              value={customAltitude}
+              onChange={(event) => setCustomAltitude(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  const value = Math.round(Number(customAltitude));
+                  if (value >= 0 && value <= 9000) {
+                    playClickSound();
+                    setAltitude(value);
+                    localStorage.setItem('ppt_altitude', value.toString());
+                    setScreen('EXERCISE');
+                  }
+                }
+              }}
+              className="min-w-0 flex-1 rounded-lg border border-gray-600 bg-gray-800 px-4 py-3 text-white outline-none focus:border-orange-500"
+            />
+
+            <button
+              type="button"
+              disabled={
+                !customAltitude ||
+                !Number.isFinite(Number(customAltitude)) ||
+                Number(customAltitude) < 0 ||
+                Number(customAltitude) > 9000
+              }
+              onClick={() => {
+                const value = Math.round(Number(customAltitude));
+                if (value < 0 || value > 9000 || !Number.isFinite(value)) return;
+
+                playClickSound();
+                setAltitude(value);
+                localStorage.setItem('ppt_altitude', value.toString());
+                setScreen('EXERCISE');
+              }}
+              className="rounded-lg bg-white px-5 py-3 font-bold text-gray-900 transition-colors hover:bg-orange-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Go
+            </button>
           </div>
         </div>
-      )}
 
+        <button
+          type="button"
+          onClick={() => {
+            playClickSound();
+            setScreen('START');
+          }}
+          className="w-full py-2 text-sm text-gray-400 transition-colors hover:text-white"
+        >
+          ← Back
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+      
       {screen === 'EXERCISE' && (
         <div className="max-w-md mx-auto">
           <div className="mb-4">
