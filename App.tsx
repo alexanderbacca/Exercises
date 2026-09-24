@@ -921,7 +921,7 @@ const App: React.FC = () => {
 
       <footer className="p-8 text-center border-t border-white/5 bg-black/50 backdrop-blur-md">
         <p className="text-[10px] font-black uppercase tracking-[0.6em] text-neutral-700 hover:text-orange-500 transition-colors">
-          Pro Physical Tracking &copy; MMXXVI // By Alexander Bacca with Gemini 3.0
+          Pro Physical Tracking &copy; MMXXVI // By Alexander Bacca with AI tools
         </p>
       </footer>
     </div>
